@@ -94,6 +94,9 @@ DB_USER=postgres
 DB_PASSWORD=your_password 
 DB_HOST=localhost
 DB_PORT=5432
+JIRA_API_TOKEN=your_jira_api_token
+JIRA_URL=https://your-domain.atlassian.net
+JIRA_ADMIN_EMAIL=your-admin@example.com
 
 # Запуск приложения
 Убедись, что PostgreSQL запущен.
@@ -165,4 +168,52 @@ Content-Type: application/json
 json
 {
     "message": "Сотрудник успешно добавлен"
+}
+
+4.Создание учетной записи сотрудникв в Jira
+
+POST /add/user/jira
+
+Добавь заголовки:
+Authorization: your-generated-token
+Content-Type: application/json
+
+Пример запроса:
+{
+    {
+    "email": "test@test.com",
+    "display_name": "test1",
+    "products": ["jira-software"]
+    }
+}
+
+Пример ответа:
+json
+{
+    "jira_data": {
+        "accountId": "557058:f2e65aff-b01b-4c82-8edd-59a4cca0e96c",
+        "accountType": "atlassian",
+        "active": true,
+        "applicationRoles": {
+            "items": [],
+            "size": 0
+        },
+        "avatarUrls": {
+            "16x16": "https://secure.gravatar.com/avatar/b642b4217b34b1e8d3bd915fc65c4452?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FS-2.png",
+            "24x24": "https://secure.gravatar.com/avatar/b642b4217b34b1e8d3bd915fc65c4452?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FS-2.png",
+            "32x32": "https://secure.gravatar.com/avatar/b642b4217b34b1e8d3bd915fc65c4452?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FS-2.png",
+            "48x48": "https://secure.gravatar.com/avatar/b642b4217b34b1e8d3bd915fc65c4452?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FS-2.png"
+        },
+        "displayName": "s",
+        "emailAddress": "test@test.com",
+        "expand": "groups,applicationRoles",
+        "groups": {
+            "items": [],
+            "size": 0
+        },
+        "locale": "en_US",
+        "self": "https://mlamps.atlassian.net/rest/api/3/user?accountId=557058:f2e65aff-b01b-4c82-8edd-59a4cca0e96c",
+        "timeZone": "Asia/Yekaterinburg"
+    },
+    "message": "Пользователь успешно добавлен в Jira"
 }
