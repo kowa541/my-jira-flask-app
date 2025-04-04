@@ -3,6 +3,10 @@ import psycopg2
 from dotenv import load_dotenv
 import os
 import uuid  # Для генерации уникального токена
+import json
+import requests
+from requests.auth import HTTPBasicAuth
+
 
 # Загружаем переменные окружения из файла .env
 load_dotenv()
@@ -64,7 +68,7 @@ def get_employees():
     employees = cursor.fetchall()
     cursor.close()
     conn.close()
-
+    print(employees)
     # Преобразуем результат в список словарей
     employees_list = []
     for employee in employees:
@@ -79,7 +83,7 @@ def get_employees():
             "is_fired": employee[7]
         })
 
-    return jsonify(employees_list), 200
+    return jsonify(*employees_list), 200
 
 # 3. Создание нового сотрудника
 @app.route('/employees', methods=['POST'])
@@ -110,6 +114,65 @@ def create_employee():
     conn.close()
 
     return jsonify({"message": "Сотрудник успешно добавлен"}), 201
+
+#4 Добавление пользователя в Jira
+@app.route('/add/user/jira', methods=["POST"])
+def create_user_Jira():
+    if not check_token(request):
+        return jsonify({"message": "Необходима авторизация"}), 401
+
+    JIRA_URL = os.getenv('JIRA_URL')
+    API_TOKEN = os.getenv('JIRA_API_TOKEN')
+    JIRA_ADMIN_EMAIL = os.getenv('JIRA_ADMIN_EMAIL')
+    
+    data = request.get_json()
+    email = data.get('email')
+    display_name = data.get('display_name')
+    products = data.get('products')
+    
+    if not email or not display_name:
+        return jsonify({"message": "Необходимы email и display_name"}), 400
+
+    try:
+        # Отправка запроса к Jira API
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+        }
+
+        user = json.dumps({
+        "emailAddress": email,
+        "displayName": display_name,
+        "products": products
+        })
+    
+        endpoint = "/rest/api/3/user"
+        response = requests.post(
+            f"{JIRA_URL}{endpoint}",
+            headers=headers,
+            auth=HTTPBasicAuth(JIRA_ADMIN_EMAIL, API_TOKEN),
+            data=user
+        )
+
+        # Обработка ответа от Jira
+        if response.status_code == 201:
+            return jsonify({
+                "message": "Пользователь успешно добавлен в Jira",
+                "jira_data": response.json()
+            }), 201
+        else:
+            return jsonify({
+                "message": "Ошибка при добавлении пользователя в Jira",
+                "jira_error": response.text
+            }), response.status_code
+
+    except Exception as e:
+        return jsonify({
+            "message": "Внутренняя ошибка сервера",
+            "error": str(e)
+        }), 500
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)
