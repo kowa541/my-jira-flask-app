@@ -34,6 +34,7 @@ API предоставляет следующие функции:
 - Flask
 - psycopg2-binary
 - python-dotenv
+- requests
 
 ---
 
