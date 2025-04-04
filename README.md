@@ -68,9 +68,13 @@ CREATE DATABASE company_db;
  ```sql
 CREATE TABLE employees (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    position VARCHAR(100),
-    salary NUMERIC(10, 2)
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
+    middle_name VARCHAR(100),
+    username VARCHAR(50) UNIQUE NOT NULL,
+    has_email BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_fired BOOLEAN DEFAULT FALSE
 );
 
 CREATE TABLE users (
@@ -78,6 +82,7 @@ CREATE TABLE users (
     username VARCHAR(50) UNIQUE NOT NULL,
     password VARCHAR(100) NOT NULL
 );
+
  ```
 Добавь тестового пользователя:
  ```sql
@@ -128,12 +133,16 @@ Authorization: your-generated-token
 Пример ответа:
 
 json
-    {
-        "id": 1,
-        "name": "Иван Иванов",
-        "position": "Менеджер",
-        "salary": 50000
-    }
+ {
+     "id": 1,
+     "first_name": "Иван",
+     "last_name": "Иванов",
+     "middle_name": "Иванович",
+     "username": "ivan_ivanov",
+     "has_email": true,
+     "created_at": "2023-10-01T12:34:56",
+     "is_fired": false
+ }
 
 3. Создание нового сотрудника
 POST /employees
@@ -143,11 +152,13 @@ Authorization: your-generated-token
 Content-Type: application/json
 
 Пример запроса:
-json
 {
-    "name": "Петр Петров",
-    "position": "Разработчик",
-    "salary": 70000
+    "first_name": "Петр",
+    "last_name": "Петров",
+    "middle_name": "Петрович",
+    "username": "petr_petrov",
+    "has_email": true,
+    "is_fired": false
 }
 
 Пример ответа:
