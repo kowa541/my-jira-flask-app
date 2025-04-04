@@ -70,9 +70,13 @@ def get_employees():
     for employee in employees:
         employees_list.append({
             "id": employee[0],
-            "name": employee[1],
-            "position": employee[2],
-            "salary": float(employee[3])
+            "first_name": employee[1],
+            "last_name": employee[2],
+            "middle_name": employee[3],
+            "username": employee[4],
+            "has_email": employee[5],
+            "created_at": employee[6].isoformat(),  # Преобразуем дату в строку
+            "is_fired": employee[7]
         })
 
     return jsonify(employees_list), 200
@@ -84,16 +88,23 @@ def create_employee():
         return jsonify({"message": "Необходима авторизация"}), 401
 
     data = request.get_json()
-    name = data.get('name')
-    position = data.get('position')
-    salary = data.get('salary')
+    first_name = data.get('first_name')
+    last_name = data.get('last_name')
+    middle_name = data.get('middle_name')
+    username = data.get('username')
+    has_email = data.get('has_email', False)  # По умолчанию False
+    is_fired = data.get('is_fired', False)  # По умолчанию False
 
-    if not name or not position or not salary:
+    # Проверка обязательных полей
+    if not first_name or not last_name or not username:
         return jsonify({"message": "Недостаточно данных"}), 400
 
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO employees (name, position, salary) VALUES (%s, %s, %s)", (name, position, salary))
+    cursor.execute("""
+        INSERT INTO employees (first_name, last_name, middle_name, username, has_email, is_fired)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    """, (first_name, last_name, middle_name, username, has_email, is_fired))
     conn.commit()
     cursor.close()
     conn.close()
