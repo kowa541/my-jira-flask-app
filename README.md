@@ -183,7 +183,6 @@ Content-Type: application/json
 {
     {
     "email": "test@test.com",
-    "display_name": "test1",
     "products": ["jira-software"]
     }
 }
