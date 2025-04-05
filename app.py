@@ -127,10 +127,10 @@ def create_user_Jira():
     
     data = request.get_json()
     email = data.get('email')
-    display_name = data.get('display_name')
     products = data.get('products')
-    
-    if not email or not display_name:
+
+
+    if not email:
         return jsonify({"message": "Необходимы email и display_name"}), 400
 
     try:
@@ -142,8 +142,7 @@ def create_user_Jira():
 
         user = json.dumps({
         "emailAddress": email,
-        "displayName": display_name,
-        "products": products
+        "products": products,
         })
     
         endpoint = "/rest/api/3/user"
