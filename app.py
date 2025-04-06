@@ -131,7 +131,7 @@ def create_user_Jira():
 
 
     if not email:
-        return jsonify({"message": "Необходимы email и display_name"}), 400
+        return jsonify({"message": "Необходимы email"}), 400
 
     try:
         # Отправка запроса к Jira API
