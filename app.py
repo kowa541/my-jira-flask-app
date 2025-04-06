@@ -224,8 +224,9 @@ def block_user_jira():
         )
 
         if block_response.status_code == 204:
+            #Все равно ничего не выводит бусть будет
             return jsonify({
-                "message": "Пользователь успешно удалён"
+                "message": "Пользователь успешно удалён",
             }), 204
         elif block_response.status_code == 400:
             return jsonify({
