@@ -83,7 +83,7 @@ def get_employees():
             "is_fired": employee[7]
         })
 
-    return jsonify(*employees_list), 200
+    return jsonify(employees_list), 200
 
 # 3. Создание нового сотрудника
 @app.route('/employees', methods=['POST'])
@@ -131,7 +131,7 @@ def create_user_Jira():
 
 
     if not email:
-        return jsonify({"message": "Необходимы email и display_name"}), 400
+        return jsonify({"message": "Необходимы email"}), 400
 
     try:
         # Отправка запроса к Jira API
@@ -172,6 +172,77 @@ def create_user_Jira():
         }), 500
 
 
+#5 блоикровка сотрудника в jira
+@app.route('/block/user/jira',methods=['DELETE'])
+def block_user_jira():
+    if not check_token(request):
+        return jsonify({"message": "Необходима авторизация"}), 401
 
+    JIRA_URL = os.getenv('JIRA_URL')
+    API_TOKEN = os.getenv('JIRA_API_TOKEN')
+    JIRA_ADMIN_EMAIL = os.getenv('JIRA_ADMIN_EMAIL')
+    blcok_endpoint = '/rest/api/3/user'
+    search_endpoint = '/rest/api/3/user/search'
+    headers = {
+        "Accept": "application/json"
+    }
+    data = request.get_json()
+    username = data.get('username')
+    if not username:
+        return jsonify({"message": "Необходим username"}), 400
+    try:
+
+        search_response = requests.get(
+            f"{JIRA_URL}{search_endpoint}?query={username}",
+            headers=headers,
+            auth=HTTPBasicAuth(JIRA_ADMIN_EMAIL,API_TOKEN)
+        )
+
+        if search_response.status_code != 200 or not search_response.json():
+            return jsonify({
+                "message": "Пользователь не найден",
+                "error": search_response.text
+            }), 404
+
+        print(search_response.json())
+        for i in search_response.json():
+            for j in i:
+                if j == 'displayName':
+                    if i[j] == username:
+                        accountId = i['accountId']
+                        break
+        print(accountId)
+
+        query = {
+            'accountId': accountId
+        }
+        
+        block_response = requests.delete(
+            f'{JIRA_URL}{blcok_endpoint}',
+            params=query,
+            auth=HTTPBasicAuth(JIRA_ADMIN_EMAIL,API_TOKEN)
+        )
+
+        if block_response.status_code == 204:
+            #Все равно ничего не выводит бусть будет
+            return jsonify({
+                "message": "Пользователь успешно удалён",
+            }), 204
+        elif block_response.status_code == 400:
+            return jsonify({
+                "message": "Пользователь не может быть удалён",
+                "error": block_response.text
+            }), 400
+        elif block_response.status_code == 403:
+            return jsonify({
+                "message": 'У вас недостаточно прав',
+                "eror": block_response.text
+            }), 403
+        
+    except Exception as e:
+        return jsonify({
+            "message": "Внутренняя ошибка сервера",
+            "error": str(e)
+        }), 500
 if __name__ == '__main__':
     app.run(debug=True)
