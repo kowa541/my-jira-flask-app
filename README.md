@@ -217,3 +217,19 @@ json
     },
     "message": "Пользователь успешно добавлен в Jira"
 }
+
+5.Блокировка пользователя в Jira
+
+DELETE /block/user/jira
+
+Добавь заголовки:
+Authorization: your-generated-token
+
+Пример запроса:
+json
+{
+    "username": "blalagazc"
+}
+
+Пример ответа:
+204 NO CONTENT
