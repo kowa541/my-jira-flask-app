@@ -115,6 +115,44 @@ def create_employee():
 
     return jsonify({"message": "Сотрудник успешно добавлен"}), 201
 
+# авторизация в jira тест так как нихуя не работет
+@app.route('/jira/auth', methods=["POST"])
+def login_in_jira():
+    if not check_token(request):
+        return jsonify({"message": "Необходима авторизация"}), 401
+
+    JIRA_URL = os.getenv('JIRA_URL')
+    print(JIRA_URL)
+    endpoint = '/rest/auth/1/session'
+    
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    token = os.getenv("JIRA_ADMIN_SERVER_TOKEN")
+
+    if not username or not password:
+        return jsonify({"message": "Нужны и username, и password"}), 400
+
+    response = requests.post(
+        f"{JIRA_URL}{endpoint}",
+        headers={"Content-Type": "application/json"},
+        json={"username": username, "password": token}
+    )
+
+    if response.status_code == 200:
+        session_data = response.json().get("session", {})
+        return jsonify({
+            "message": "Авторизация успешна",
+            "session": session_data
+        }), 200
+    else:
+        return jsonify({
+            "message": "Ошибка авторизации",
+            "status_code": response.status_code,
+            "error": response.json() if response.headers.get("Content-Type", "").startswith("application/json") else response.text
+        }), response.status_code
+
+
 #4 Добавление пользователя в Jira
 @app.route('/add/user/jira', methods=["POST"])
 def create_user_Jira():
@@ -124,6 +162,8 @@ def create_user_Jira():
     JIRA_URL = os.getenv('JIRA_URL')
     API_TOKEN = os.getenv('JIRA_API_TOKEN')
     JIRA_ADMIN_EMAIL = os.getenv('JIRA_ADMIN_EMAIL')
+    TOKEN = os.getenv("JIRA_ADMIN_SERVER_TOKEN")
+    print(TOKEN)
     
     data = request.get_json()
     email = data.get('email')
@@ -141,15 +181,17 @@ def create_user_Jira():
         }
 
         user = json.dumps({
+        "name": 'test',
         "emailAddress": email,
-        "products": products,
+        # "products": products,
+        # "applicationKeys": ["jira-core"]
         })
     
-        endpoint = "/rest/api/3/user"
+        endpoint = "/rest/api/2/user"
         response = requests.post(
             f"{JIRA_URL}{endpoint}",
             headers=headers,
-            auth=HTTPBasicAuth(JIRA_ADMIN_EMAIL, API_TOKEN),
+            auth=HTTPBasicAuth(JIRA_ADMIN_EMAIL,TOKEN),
             data=user
         )
 
