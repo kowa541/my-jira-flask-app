@@ -251,7 +251,7 @@ Authorization: your-generated-token
 json
 {
     "username": "dummy",
-    "rights": "read",
+    "group": "read",
     "ssh_host": "localhost",
     "ssh_port": "22",
     "ssh_user": "root",
