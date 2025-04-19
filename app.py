@@ -277,10 +277,10 @@ def create_user_shh():
         return jsonify({"message": "Необходима авторизация"}), 401
     data = request.get_json()
     username = data.get('username')
-    rights = data.get('rights')
+    group = data.get('group')
     ssh = get_ssh_server_connection(request)
 
-    if not username or not rights:
+    if not username or not group:
         return jsonify({"message": "Недостаточно данных"}), 400
 
     match ssh:
@@ -291,9 +291,21 @@ def create_user_shh():
         case 502:
             return jsonify({"message": "Плохой шлюз"}), 502
 
+    stdin, stdout, stderr = ssh.exec_command(f"getent group {group}")
+    check_group = stdout.read().decode().strip() == ""
+
+    if check_group:
+        return jsonify({"message": "Указанная группа отсутствует"}), 404
+
+    stdin, stdout, stderr = ssh.exec_command(f"id {username}")
+    check_user = stdout.channel.recv_exit_status() == 0
+
+    if check_user:
+        return jsonify({"message": "Имя пользователя занято"}), 409
+
     commands = [
         f"sudo useradd -m {username}",
-        f"sudo usermod {rights} {username}"
+        f"sudo usermod -G {group} {username}"
     ]
 
     for cmd in commands:
