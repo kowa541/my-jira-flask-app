@@ -1,121 +1,61 @@
-# Flask API Project
+# My Jira Flask App
 
-Это простое API на Flask с использованием PostgreSQL для управления сотрудниками. Проект включает функции авторизации, просмотра и создания сотрудников.
+Это приложение на Flask, которое интегрируется с Jira и PostgreSQL через Docker.
 
 ## Содержание
-
-1. [Описание проекта](#описание-проекта)
-2. [Требования](#требования)
-3. [Установка](#установка)
-4. [Настройка базы данных](#настройка-базы-данных)
-5. [Запуск приложения](#запуск-приложения)
-6. [Использование API](#использование-api)
-7. [Лицензия](#лицензия)
+- [Описание](#описание)
+- [Требования](#требования)
+- [Установка](#установка)
+- [Запуск](#запуск)
+- [API Endpoints](#api-endpoints)
+- [Лицензия](#лицензия)
 
 ---
 
-## Описание проекта
+## Описание
 
-API предоставляет следующие функции:
-- **Авторизация**: Получение токена для доступа к защищённым эндпоинтам.
-- **Просмотр всех сотрудников**: Получение списка всех сотрудников.
-- **Создание нового сотрудника**: Добавление нового сотрудника в базу данных.
-- **Создание SSH-пользователя**: Добавление нового пользователя на SSH сервер.
-- **Добавление SSH-ключа**: Добавление публичного ключа пользователя на SSH сервер.
-- **Список учётных записей SSH на хосте**: Получение списка все пользователей на SSH сервере.
-- **Список агентов**: Получение агентов на SSH сервере.
+Это приложение предоставляет REST API для работы с Jira и базой данных PostgreSQL. Оно позволяет:
+- Авторизоваться в Jira.
+- Добавлять новых пользователей в Jira.
+- Управлять данными о сотрудниках в PostgreSQL.
 
 ---
 
 ## Требования
 
-Для работы с проектом необходимо установить:
-- Python 3.x
-- PostgreSQL
-- Git (для клонирования репозитория)
-
-Также потребуются следующие Python-библиотеки:
-- Flask
-- psycopg2-binary
-- python-dotenv
-- requests
-- paramiko
-- socket
+Для запуска проекта вам понадобятся:
+- Docker и Docker Compose
+- Python 3.8+
+- База данных PostgreSQL
+- Аккаунт Jira с правами администратора
 
 ---
 
 ## Установка
 
-1. Клонируй репозиторий:
-
+1. **Клонируйте репозиторий:**
    ```bash
-   git clone https://github.com/kowa541/apishka.git
-   cd apishka
-2. Создай виртуальное окружение:
-   ```bash
-   python -m venv venv
-3. Активируй виртуальное окружение:
-  Для Windows:
-  ```powershell
-  .\venv\Scripts\Activate
-  ```
-  Для macOS/Linux:
-  ```bash
-  source venv/bin/activate
-  ```
-4. Установи зависимости
+   git clone https://github.com/your-username/my-jira-flask-app.git
+   cd my-jira-flask-app
+2. Добавьте файл .env
+   DB_NAME=company_db
+   DB_USER=postgres
+   DB_PASSWORD=sStwxj
+   DB_HOST=db
+   DB_PORT=5432
+   JIRA_URL=http://jira:8080
+   JIRA_ADMIN_EMAIL=everythingoes@inbox.ru
+   JIRA_API_TOKEN=your_api_token_here
+   
+3. Запуск
+   Запуск через Docker:
+      docker-compose up --build
+   После запуска:
+      Flask будет доступен на http://localhost:5000.
+      Jira будет доступна на http://localhost:8080.
+   Остановка контейнеров:
+      docker-compose down
 
-# Настройка базы данных
-1. Установи и запусти PostgreSQL.
-  Создай базу данных:
- ```sql
-CREATE DATABASE company_db;
- ```
-Создай таблицы: 
- ```sql
-CREATE TABLE employees (
-    id SERIAL PRIMARY KEY,
-    first_name VARCHAR(100) NOT NULL,
-    last_name VARCHAR(100) NOT NULL,
-    middle_name VARCHAR(100),
-    username VARCHAR(50) UNIQUE NOT NULL,
-    has_email BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_fired BOOLEAN DEFAULT FALSE
-);
-
-CREATE TABLE users (
-    id SERIAL PRIMARY KEY,
-    username VARCHAR(50) UNIQUE NOT NULL,
-    password VARCHAR(100) NOT NULL
-);
-
- ```
-Добавь тестового пользователя:
- ```sql
-INSERT INTO users (username, password) VALUES ('admin', 'password123');
- ```
-Создай файл .env в корне проекта и добавь данные для подключения к базе данных:
-DB_NAME=company_db
-DB_USER=postgres
-DB_PASSWORD=your_password 
-DB_HOST=localhost
-DB_PORT=5432
-JIRA_API_TOKEN=your_jira_api_token
-JIRA_URL=https://your-domain.atlassian.net
-JIRA_ADMIN_EMAIL=your-admin@example.com
-
-# Запуск приложения
-Убедись, что PostgreSQL запущен.
-Активируй виртуальное окружение (если оно не активировано):
-```powershell
-.\venv\Scripts\Activate
-```
-Запусти приложение:
-```bash
-python app.py
-```
-API будет доступно по адресу http://127.0.0.1:5000.
 
 # Использование API POSTMAN
 1. Авторизация
