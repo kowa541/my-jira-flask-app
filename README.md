@@ -20,6 +20,10 @@ API предоставляет следующие функции:
 - **Авторизация**: Получение токена для доступа к защищённым эндпоинтам.
 - **Просмотр всех сотрудников**: Получение списка всех сотрудников.
 - **Создание нового сотрудника**: Добавление нового сотрудника в базу данных.
+- **Создание SSH-пользователя**: Добавление нового пользователя на SSH сервер.
+- **Добавление SSH-ключа**: Добавление публичного ключа пользователя на SSH сервер.
+- **Список учётных записей SSH на хосте**: Получение списка все пользователей на SSH сервере.
+- **Список агентов**: Получение агентов на SSH сервере.
 
 ---
 
@@ -35,6 +39,8 @@ API предоставляет следующие функции:
 - psycopg2-binary
 - python-dotenv
 - requests
+- paramiko
+- socket
 
 ---
 
@@ -233,3 +239,101 @@ json
 
 Пример ответа:
 204 NO CONTENT
+
+6. Создание SSH-пользователя
+    
+POST /add/user/ssh
+
+Добавь заголовки:
+Authorization: your-generated-token
+
+Пример запроса:
+json
+{
+    "username": "dummy",
+    "group": "read",
+    "ssh_host": "localhost",
+    "ssh_port": "22",
+    "ssh_user": "root",
+    "ssh_passphrase": "test"
+}
+
+Пример ответа:
+json
+{
+    "message": "SSH-Пользователь успешно добавлен"
+}
+
+7. Добавление SSH-ключа
+
+POST /add/key/ssh
+
+Добавь заголовки:
+Authorization: your-generated-token
+
+Пример запроса:
+json
+{
+    "username": "dummy",
+    "pub_key": "<your_ssh_public_key>",
+    "ssh_host": "localhost",
+    "ssh_port": "22",
+    "ssh_user": "root",
+    "ssh_passphrase": "test"
+}
+
+Пример ответа:
+json
+{
+    "message": "SSH-ключ успешно добавлен"
+}
+
+8. Список учетных записей SSH на хосте
+
+GET /get/users/ssh
+
+Добавь заголовки:
+Authorization: your-generated-token
+
+Пример запроса:
+json
+{
+    "ssh_host": "localhost",
+    "ssh_port": "22",
+    "ssh_user": "root",
+    "ssh_passphrase": "test"
+}
+
+Пример ответа:
+
+json
+{
+    [
+        "root",
+        "dummy"
+    ]
+}
+
+9. Список агентов
+
+GET /get/agents/ssh
+
+Добавь заголовки:
+Authorization: your-generated-token
+
+Пример запроса:
+json
+{
+    "ssh_host": "localhost",
+    "ssh_port": "22",
+    "ssh_user": "root",
+    "ssh_passphrase": "test"
+}
+
+Пример ответа:
+
+json
+{
+    [
+    ]
+}
