@@ -10,12 +10,12 @@ services:
     environment:
       - DB_NAME=company_db
       - DB_USER=postgres
-      - DB_PASSWORD=sStwxj
+      - DB_PASSWORD=your-password
       - DB_HOST=db
       - DB_PORT=5432
       - JIRA_URL=http://jira:8080  # Используем имя сервиса Jira внутри Docker
-      - JIRA_ADMIN_EMAIL=
-      - JIRA_API_TOKEN=
+      - JIRA_ADMIN_EMAIL=your-email
+      - JIRA_API_TOKEN=your-token
     depends_on:
       - db
       - jira
@@ -29,7 +29,7 @@ services:
     environment:
       POSTGRES_DB: company_db  # Имя базы данных
       POSTGRES_USER: postgres  # Имя пользователя
-      POSTGRES_PASSWORD: sStwxj  # Пароль пользователя
+      POSTGRES_PASSWORD: your-password  # Пароль пользователя
     ports:
       - "5432:5432"  # PostgreSQL доступен на localhost:5432
     volumes:
