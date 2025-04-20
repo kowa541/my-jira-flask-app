@@ -40,11 +40,11 @@
 2. Добавьте файл .env
    DB_NAME=company_db
    DB_USER=postgres
-   DB_PASSWORD=sStwxj
+   DB_PASSWORD=your-password
    DB_HOST=db
    DB_PORT=5432
    JIRA_URL=http://jira:8080
-   JIRA_ADMIN_EMAIL=everythingoes@inbox.ru
+   JIRA_ADMIN_EMAIL=your-email
    JIRA_API_TOKEN=your_api_token_here
    
 3. Запуск
