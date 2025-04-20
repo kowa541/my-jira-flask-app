@@ -5,10 +5,7 @@ import os
 import uuid  # Для генерации уникального токена
 import json
 import requests
-from paramiko.ssh_exception import AuthenticationException
 from requests.auth import HTTPBasicAuth
-import paramiko
-import socket
 
 
 # Загружаем переменные окружения из файла .env
@@ -118,45 +115,48 @@ def create_employee():
 
     return jsonify({"message": "Сотрудник успешно добавлен"}), 201
 
-# авторизация в jira тест так как нихуя не работет
 @app.route('/jira/auth', methods=["POST"])
 def login_in_jira():
     if not check_token(request):
         return jsonify({"message": "Необходима авторизация"}), 401
 
     JIRA_URL = os.getenv('JIRA_URL')
-    print(JIRA_URL)
-    endpoint = '/rest/auth/1/session'
-    
+    API_TOKEN = os.getenv('JIRA_API_TOKEN')
+    JIRA_ADMIN_EMAIL = os.getenv('JIRA_ADMIN_EMAIL')
+
     data = request.get_json()
     username = data.get('username')
-    password = data.get('password')
-    token = os.getenv("JIRA_ADMIN_SERVER_TOKEN")
 
-    if not username or not password:
-        return jsonify({"message": "Нужны и username, и password"}), 400
+    if not username:
+        return jsonify({"message": "Необходим username"}), 400
 
-    response = requests.post(
-        f"{JIRA_URL}{endpoint}",
-        headers={"Content-Type": "application/json"},
-        json={"username": username, "password": token}
-    )
+    try:
+        # Проверка авторизации
+        response = requests.get(
+            f"{JIRA_URL}/rest/api/3/myself",
+            auth=HTTPBasicAuth(username, API_TOKEN)
+        )
 
-    if response.status_code == 200:
-        session_data = response.json().get("session", {})
+        if response.status_code == 200:
+            user_data = response.json()
+            return jsonify({
+                "message": "Авторизация успешна",
+                "user": user_data
+            }), 200
+        else:
+            return jsonify({
+                "message": "Ошибка авторизации",
+                "status_code": response.status_code,
+                "error": response.text
+            }), response.status_code
+
+    except Exception as e:
         return jsonify({
-            "message": "Авторизация успешна",
-            "session": session_data
-        }), 200
-    else:
-        return jsonify({
-            "message": "Ошибка авторизации",
-            "status_code": response.status_code,
-            "error": response.json() if response.headers.get("Content-Type", "").startswith("application/json") else response.text
-        }), response.status_code
+            "message": "Внутренняя ошибка сервера",
+            "error": str(e)
+        }), 500
 
 
-#4 Добавление пользователя в Jira
 @app.route('/add/user/jira', methods=["POST"])
 def create_user_Jira():
     if not check_token(request):
@@ -165,40 +165,47 @@ def create_user_Jira():
     JIRA_URL = os.getenv('JIRA_URL')
     API_TOKEN = os.getenv('JIRA_API_TOKEN')
     JIRA_ADMIN_EMAIL = os.getenv('JIRA_ADMIN_EMAIL')
-    TOKEN = os.getenv("JIRA_ADMIN_SERVER_TOKEN")
-    print(TOKEN)
-    
+
     data = request.get_json()
     email = data.get('email')
-    products = data.get('products')
+    name = data.get('name')  # Уникальное имя пользователя
 
-
-    if not email:
-        return jsonify({"message": "Необходимы email"}), 400
+    if not email or not name:
+        return jsonify({"message": "Необходимы email и name"}), 400
 
     try:
-        # Отправка запроса к Jira API
+        # Проверка существования пользователя
+        search_response = requests.get(
+            f"{JIRA_URL}/rest/api/3/user/search?query={name}",
+            auth=HTTPBasicAuth(JIRA_ADMIN_EMAIL, API_TOKEN)
+        )
+
+        if search_response.status_code == 200 and search_response.json():
+            return jsonify({
+                "message": "Пользователь уже существует",
+                "existing_user": search_response.json()
+            }), 409
+
+        # Создание пользователя
         headers = {
             "Accept": "application/json",
             "Content-Type": "application/json"
         }
 
-        user = json.dumps({
-        "name": 'test',
-        "emailAddress": email,
-        # "products": products,
-        # "applicationKeys": ["jira-core"]
+        user_data = json.dumps({
+            "emailAddress": email,
+            "name": name,
+            "displayName": name
         })
-    
-        endpoint = "/rest/api/2/user"
+
+        endpoint = "/rest/api/3/user"
         response = requests.post(
             f"{JIRA_URL}{endpoint}",
             headers=headers,
-            auth=HTTPBasicAuth(JIRA_ADMIN_EMAIL,TOKEN),
-            data=user
+            auth=HTTPBasicAuth(JIRA_ADMIN_EMAIL, API_TOKEN),
+            data=user_data
         )
 
-        # Обработка ответа от Jira
         if response.status_code == 201:
             return jsonify({
                 "message": "Пользователь успешно добавлен в Jira",
@@ -216,9 +223,7 @@ def create_user_Jira():
             "error": str(e)
         }), 500
 
-
-#5 блоикровка сотрудника в jira
-@app.route('/block/user/jira',methods=['DELETE'])
+@app.route('/block/user/jira', methods=['DELETE'])
 def block_user_jira():
     if not check_token(request):
         return jsonify({"message": "Необходима авторизация"}), 401
@@ -226,21 +231,19 @@ def block_user_jira():
     JIRA_URL = os.getenv('JIRA_URL')
     API_TOKEN = os.getenv('JIRA_API_TOKEN')
     JIRA_ADMIN_EMAIL = os.getenv('JIRA_ADMIN_EMAIL')
-    blcok_endpoint = '/rest/api/3/user'
-    search_endpoint = '/rest/api/3/user/search'
-    headers = {
-        "Accept": "application/json"
-    }
+
     data = request.get_json()
     username = data.get('username')
+
     if not username:
         return jsonify({"message": "Необходим username"}), 400
-    try:
 
+    try:
+        # Поиск пользователя
+        search_endpoint = "/rest/api/3/user/search"
         search_response = requests.get(
             f"{JIRA_URL}{search_endpoint}?query={username}",
-            headers=headers,
-            auth=HTTPBasicAuth(JIRA_ADMIN_EMAIL,API_TOKEN)
+            auth=HTTPBasicAuth(JIRA_ADMIN_EMAIL, API_TOKEN)
         )
 
         if search_response.status_code != 200 or not search_response.json():
@@ -249,189 +252,35 @@ def block_user_jira():
                 "error": search_response.text
             }), 404
 
-        print(search_response.json())
-        for i in search_response.json():
-            for j in i:
-                if j == 'displayName':
-                    if i[j] == username:
-                        accountId = i['accountId']
-                        break
-        print(accountId)
+        users = search_response.json()
+        account_id = None
+        for user in users:
+            if user.get("displayName") == username:
+                account_id = user.get("accountId")
+                break
 
-        query = {
-            'accountId': accountId
-        }
-        
-        block_response = requests.delete(
-            f'{JIRA_URL}{blcok_endpoint}',
-            params=query,
-            auth=HTTPBasicAuth(JIRA_ADMIN_EMAIL,API_TOKEN)
+        if not account_id:
+            return jsonify({"message": "Пользователь не найден"}), 404
+
+        # Удаление пользователя
+        delete_endpoint = f"/rest/api/3/user?accountId={account_id}"
+        delete_response = requests.delete(
+            f"{JIRA_URL}{delete_endpoint}",
+            auth=HTTPBasicAuth(JIRA_ADMIN_EMAIL, API_TOKEN)
         )
 
-        if block_response.status_code == 204:
-            #Все равно ничего не выводит бусть будет
+        if delete_response.status_code == 204:
+            return jsonify({"message": "Пользователь успешно удален"}), 204
+        else:
             return jsonify({
-                "message": "Пользователь успешно удалён",
-            }), 204
-        elif block_response.status_code == 400:
-            return jsonify({
-                "message": "Пользователь не может быть удалён",
-                "error": block_response.text
-            }), 400
-        elif block_response.status_code == 403:
-            return jsonify({
-                "message": 'У вас недостаточно прав',
-                "error": block_response.text
-            }), 403
-        
+                "message": "Ошибка при удалении пользователя",
+                "error": delete_response.text
+            }), delete_response.status_code
+
     except Exception as e:
         return jsonify({
             "message": "Внутренняя ошибка сервера",
             "error": str(e)
         }), 500
-
-def get_ssh_server_connection(request):
-    data = request.get_json()
-
-    ssh_host = data.get('ssh_host')
-    ssh_port = int(data.get('ssh_port'))
-    ssh_user = data.get('ssh_user')
-    ssh_passphrase = data.get('ssh_passphrase')
-
-    if not ssh_host or not ssh_port or not ssh_user or not ssh_passphrase:
-        return 400
-
-    try:
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect(hostname=ssh_host, port=ssh_port, username=ssh_user, passphrase=ssh_passphrase, timeout=10)
-    except AuthenticationException:
-        return 401
-    except socket.timeout:
-        return 502
-
-    return ssh
-
-# Создание SSH-пользователя
-@app.route('/add/user/ssh',methods=['POST'])
-def create_user_shh():
-    if not check_token(request):
-        return jsonify({"message": "Необходима авторизация"}), 401
-    data = request.get_json()
-    username = data.get('username')
-    group = data.get('group')
-    ssh = get_ssh_server_connection(request)
-
-    if not username or not group:
-        return jsonify({"message": "Недостаточно данных"}), 400
-
-    match ssh:
-        case 400:
-            return jsonify({"message": "Недостаточно данных"}), 400
-        case 401:
-            return jsonify({"message": "Ошибка аутентификации SSH"}), 401
-        case 502:
-            return jsonify({"message": "Плохой шлюз"}), 502
-
-    stdin, stdout, stderr = ssh.exec_command(f"getent group {group}")
-    check_group = stdout.read().decode().strip() == ""
-
-    if check_group:
-        return jsonify({"message": "Указанная группа отсутствует"}), 404
-
-    stdin, stdout, stderr = ssh.exec_command(f"id {username}")
-    check_user = stdout.channel.recv_exit_status() == 0
-
-    if check_user:
-        return jsonify({"message": "Имя пользователя занято"}), 409
-
-    commands = [
-        f"sudo useradd -m {username}",
-        f"sudo usermod -G {group} {username}"
-    ]
-
-    for cmd in commands:
-        stdin, stdout, stderr = ssh.exec_command(cmd)
-        print(stdout.read().decode(), stderr.read().decode())
-
-    ssh.close()
-
-    return jsonify({"message":"SSH-Пользователь успешно добавлен"}), 201
-
-# Добавление SSH-ключа
-@app.route('/add/key/ssh',methods=['POST'])
-def add_key_shh():
-    if not check_token(request):
-        return jsonify({"message": "Необходима авторизация"}), 401
-    data = request.get_json()
-    username = data.get('username')
-    pub_key = data.get('pub_key')
-    ssh = get_ssh_server_connection(request)
-
-    if not username or not pub_key:
-        return jsonify({"message": "Недостаточно данных"}), 400
-
-    match ssh:
-        case 400:
-            return jsonify({"message": "Недостаточно данных"}), 400
-        case 401:
-            return jsonify({"message": "Ошибка аутентификации SSH"}), 401
-        case 502:
-            return jsonify({"message": "Плохой шлюз"}), 502
-
-    cmd = (f"mkdir -p /home/{username}/.ssh && echo '{pub_key}'"
-           f" >> /home/{username}/.ssh/authorized_keys"
-           f" && chown -R {username}:{username} /home/{username}/.ssh")
-    ssh.exec_command(cmd)
-
-    ssh.close()
-
-    return jsonify({"message": "SSH-ключ успешно добавлен"}), 201
-
-# Список учетных записей SSH на хосте
-@app.route('/get/users/ssh',methods=['GET'])
-def get_users_ssh():
-    if not check_token(request):
-        return jsonify({"message": "Необходима авторизация"}), 401
-    ssh = get_ssh_server_connection(request)
-
-    match ssh:
-        case 400:
-            return jsonify({"message": "Недостаточно данных"}), 400
-        case 401:
-            return jsonify({"message": "Ошибка аутентификации SSH"}), 401
-        case 502:
-            return  jsonify({"message": "Плохой шлюз"}), 502
-
-    stdin, stdout, stderr = ssh.exec_command("cat /etc/passwd | cut -d: -f1")
-    users = stdout.read().decode().splitlines()
-
-    ssh.close()
-
-    return jsonify(users), 200
-
-# Список агентов
-@app.route('/get/agents/ssh',methods=['GET'])
-def get_agents_ssh():
-    if not check_token(request):
-        return jsonify({"message": "Необходима авторизация"}), 401
-    ssh = get_ssh_server_connection(request)
-
-    match ssh:
-        case 400:
-            return jsonify({"message": "Недостаточно данных"}), 400
-        case 401:
-            return jsonify({"message": "Ошибка аутентификации SSH"}), 401
-        case 502:
-            return jsonify({"message": "Плохой шлюз"}), 502
-
-    cmd = "ssh-add -l"
-    stdin, stdout, stderr = ssh.exec_command(cmd)
-    agents = stdout.read().decode().splitlines()
-
-    ssh.close()
-
-    return jsonify(agents), 200
-
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000)
