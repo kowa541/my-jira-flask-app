@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  flask:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"  # Flask доступен на localhost:5000
+    environment:
+      - DB_NAME=company_db
+      - DB_USER=postgres
+      - DB_PASSWORD=sStwxj
+      - DB_HOST=db
+      - DB_PORT=5432
+      - JIRA_URL=http://jira:8080  # Используем имя сервиса Jira внутри Docker
+      - JIRA_ADMIN_EMAIL=
+      - JIRA_API_TOKEN=
+    depends_on:
+      - db
+      - jira
+    volumes:
+      - ./app:/app  # Монтируем папку с кодом приложения
+    restart: always
+
+  db:
+    image: postgres:15
+    container_name: db
+    environment:
+      POSTGRES_DB: company_db  # Имя базы данных
+      POSTGRES_USER: postgres  # Имя пользователя
+      POSTGRES_PASSWORD: sStwxj  # Пароль пользователя
+    ports:
+      - "5432:5432"  # PostgreSQL доступен на localhost:5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # Данные сохраняются локально
+    restart: always
+
+  jira:
+    image: atlassian/jira-software
+    container_name: jira
+    ports:
+      - "8080:8080"  # Jira доступен на localhost:8080
+    volumes:
+      - ./jira-data:/var/atlassian/application-data/jira  # Данные Jira сохраняются локально
+    environment:
+      - JVM_MINIMUM_MEMORY=512m
+      - JVM_MAXIMUM_MEMORY=1024m
+    depends_on:
+      - db  # Jira зависит от PostgreSQL
+    restart: always
+
+volumes:
+  postgres_data:  # Том для данных PostgreSQL
