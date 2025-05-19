@@ -5,6 +5,8 @@ import os
 import uuid  # Для генерации уникального токена
 import json
 import requests
+import paramiko
+from paramiko.ssh_exception import AuthenticationException, NoValidConnectionsError
 from requests.auth import HTTPBasicAuth
 
 
@@ -25,6 +27,11 @@ def get_db_connection():
         host=os.getenv('DB_HOST'),
         port=os.getenv('DB_PORT')
     )
+    cur = conn.cursor()
+    cur.execute("SELECT current_database(), current_user;")
+    db_info = cur.fetchone()
+    print(f"Подключено к БД: {db_info[0]}, пользователь: {db_info[1]}")
+    cur.close()
     return conn
 
 # 1. Авторизация
@@ -282,5 +289,173 @@ def block_user_jira():
             "message": "Внутренняя ошибка сервера",
             "error": str(e)
         }), 500
+
+def get_ssh_server_connection(request):
+    data = request.get_json()
+
+    ssh_host = data.get('ssh_host')
+    ssh_port = int(data.get('ssh_port'))
+    ssh_user = data.get('ssh_user')
+    ssh_passphrase = data.get('ssh_passphrase')
+
+    if not ssh_host or not ssh_port or not ssh_user or not ssh_passphrase:
+        return 400
+
+    try:
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(hostname=ssh_host, port=ssh_port, username=ssh_user, passphrase=ssh_passphrase, timeout=10)
+    except AuthenticationException:
+        return 401
+    except NoValidConnectionsError:
+        return 502
+
+    return ssh
+
+# Создание SSH-пользователя
+@app.route('/add/user/ssh',methods=['POST'])
+def create_user_shh():
+    if not check_token(request):
+        return jsonify({"message": "Необходима авторизация"}), 401
+    data = request.get_json()
+    username = data.get('username')
+    group = data.get('group')
+    ssh = get_ssh_server_connection(request)
+
+    if not username or not group:
+        return jsonify({"message": "Недостаточно данных"}), 400
+
+    match ssh:
+        case 400:
+            return jsonify({"message": "Недостаточно данных"}), 400
+        case 401:
+            return jsonify({"message": "Ошибка аутентификации SSH"}), 401
+        case 502:
+            return jsonify({"message": "Плохой шлюз"}), 502
+
+    stdin, stdout, stderr = ssh.exec_command(f"getent group {group}")
+    check_group = stdout.read().decode().strip() == ""
+
+    if check_group:
+        return jsonify({"message": "Указанная группа отсутствует"}), 404
+
+    stdin, stdout, stderr = ssh.exec_command(f"id {username}")
+    check_user = stdout.channel.recv_exit_status() == 0
+
+    if check_user:
+        return jsonify({"message": "Имя пользователя занято"}), 409
+
+    commands = [
+        f"sudo useradd -m {username}",
+        f"sudo usermod -G {group} {username}"
+    ]
+
+    for cmd in commands:
+        stdin, stdout, stderr = ssh.exec_command(cmd)
+        print(stdout.read().decode(), stderr.read().decode())
+
+    ssh.close()
+
+    return jsonify({"message":"SSH-Пользователь успешно добавлен"}), 201
+
+# Добавление SSH-ключа
+@app.route('/add/key/ssh',methods=['POST'])
+def add_key_shh():
+    if not check_token(request):
+        return jsonify({"message": "Необходима авторизация"}), 401
+    data = request.get_json()
+    username = data.get('username')
+    pub_key = data.get('pub_key')
+    ssh = get_ssh_server_connection(request)
+
+    if not username or not pub_key:
+        return jsonify({"message": "Недостаточно данных"}), 400
+
+    match ssh:
+        case 400:
+            return jsonify({"message": "Недостаточно данных"}), 400
+        case 401:
+            return jsonify({"message": "Ошибка аутентификации SSH"}), 401
+        case 502:
+            return jsonify({"message": "Плохой шлюз"}), 502
+
+    cmd = (f"mkdir -p /home/{username}/.ssh && echo '{pub_key}'"
+           f" >> /home/{username}/.ssh/authorized_keys"
+           f" && chown -R {username}:{username} /home/{username}/.ssh")
+    ssh.exec_command(cmd)
+
+    ssh.close()
+
+    return jsonify({"message": "SSH-ключ успешно добавлен"}), 201
+
+# Список учетных записей SSH на хосте
+@app.route('/get/users/ssh',methods=['GET'])
+def get_users_ssh():
+    if not check_token(request):
+        return jsonify({"message": "Необходима авторизация"}), 401
+    ssh = get_ssh_server_connection(request)
+
+    match ssh:
+        case 400:
+            return jsonify({"message": "Недостаточно данных"}), 400
+        case 401:
+            return jsonify({"message": "Ошибка аутентификации SSH"}), 401
+        case 502:
+            return  jsonify({"message": "Плохой шлюз"}), 502
+
+    stdin, stdout, stderr = ssh.exec_command("cat /etc/passwd | cut -d: -f1")
+    users = stdout.read().decode().splitlines()
+
+    ssh.close()
+
+    return jsonify(users), 200
+
+# Список агентов
+@app.route('/get/agents/ssh',methods=['GET'])
+def get_agents_ssh():
+    if not check_token(request):
+        return jsonify({"message": "Необходима авторизация"}), 401
+    ssh = get_ssh_server_connection(request)
+
+    match ssh:
+        case 400:
+            return jsonify({"message": "Недостаточно данных"}), 400
+        case 401:
+            return jsonify({"message": "Ошибка аутентификации SSH"}), 401
+        case 502:
+            return jsonify({"message": "Плохой шлюз"}), 502
+
+    cmd = "ssh-add -l"
+    stdin, stdout, stderr = ssh.exec_command(cmd)
+    agents = stdout.read().decode().splitlines()
+
+    ssh.close()
+
+    return jsonify(agents), 200
+
+@app.route('/get/servers/ssh',methods=['GET'])
+def get_servers_ssh():
+    if not check_token(request):
+        return jsonify({"message": "Необходима авторизация"}), 401
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM servers")
+    servers = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    print(servers)
+    # Преобразуем результат в список словарей
+    servers_list = []
+    for server in servers:
+        servers_list.append({
+            "id": server[0],
+            "ip": server[1],
+            "port": server[2]
+        })
+
+    return jsonify(servers_list), 200
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
