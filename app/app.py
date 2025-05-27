@@ -164,6 +164,7 @@ def login_in_jira():
         }), 500
 
 
+#4 Добавление пользователя в Jira
 @app.route('/add/user/jira', methods=["POST"])
 def create_user_Jira():
     if not check_token(request):
@@ -171,53 +172,46 @@ def create_user_Jira():
 
     JIRA_URL = os.getenv('JIRA_URL')
     API_TOKEN = os.getenv('JIRA_API_TOKEN')
-    JIRA_ADMIN_EMAIL = os.getenv('JIRA_ADMIN_EMAIL')
 
+    JIRA_ADMIN_EMAIL = os.getenv('JIRA_ADMIN_EMAIL')
+    print(JIRA_ADMIN_EMAIL)
+    print(JIRA_URL)
+    print(API_TOKEN)
     data = request.get_json()
     email = data.get('email')
-    name = data.get('name')  # Уникальное имя пользователя
+    products = data.get('products')
 
-    if not email or not name:
-        return jsonify({"message": "Необходимы email и name"}), 400
+
+    if not email or not products:
+        return jsonify({"message": "Необходимы email и products"}), 400
 
     try:
-        # Проверка существования пользователя
-        search_response = requests.get(
-            f"{JIRA_URL}/rest/api/3/user/search?query={name}",
-            auth=HTTPBasicAuth(JIRA_ADMIN_EMAIL, API_TOKEN)
-        )
-
-        if search_response.status_code == 200 and search_response.json():
-            return jsonify({
-                "message": "Пользователь уже существует",
-                "existing_user": search_response.json()
-            }), 409
-
-        # Создание пользователя
+        # Отправка запроса к Jira API
         headers = {
             "Accept": "application/json",
             "Content-Type": "application/json"
         }
 
-        user_data = json.dumps({
-            "emailAddress": email,
-            "name": name,
-            "displayName": name
+        user = json.dumps({
+        "emailAddress": email,
+        "products": products,
         })
-
         endpoint = "/rest/api/3/user"
         response = requests.post(
-            f"{JIRA_URL}{endpoint}",
+            url=f"{JIRA_URL}{endpoint}",
             headers=headers,
             auth=HTTPBasicAuth(JIRA_ADMIN_EMAIL, API_TOKEN),
-            data=user_data
+            data=user
+
         )
 
+        # Обработка ответа от Jira
         if response.status_code == 201:
             return jsonify({
                 "message": "Пользователь успешно добавлен в Jira",
                 "jira_data": response.json()
             }), 201
+
         else:
             return jsonify({
                 "message": "Ошибка при добавлении пользователя в Jira",
@@ -230,27 +224,34 @@ def create_user_Jira():
             "error": str(e)
         }), 500
 
-@app.route('/block/user/jira', methods=['DELETE'])
+
+#5 блоикровка сотрудника в jira
+@app.route('/block/user/jira',methods=['DELETE'])
+
 def block_user_jira():
     if not check_token(request):
         return jsonify({"message": "Необходима авторизация"}), 401
-
     JIRA_URL = os.getenv('JIRA_URL')
     API_TOKEN = os.getenv('JIRA_API_TOKEN')
     JIRA_ADMIN_EMAIL = os.getenv('JIRA_ADMIN_EMAIL')
+    blcok_endpoint = '/rest/api/3/user'
+    search_endpoint = '/rest/api/3/user/search'
+    headers = {
+        "Accept": "application/json"
+    }
 
     data = request.get_json()
+
+
     username = data.get('username')
 
     if not username:
         return jsonify({"message": "Необходим username"}), 400
-
     try:
-        # Поиск пользователя
-        search_endpoint = "/rest/api/3/user/search"
         search_response = requests.get(
             f"{JIRA_URL}{search_endpoint}?query={username}",
-            auth=HTTPBasicAuth(JIRA_ADMIN_EMAIL, API_TOKEN)
+            headers=headers,
+            auth=HTTPBasicAuth(JIRA_ADMIN_EMAIL,API_TOKEN)
         )
 
         if search_response.status_code != 200 or not search_response.json():
@@ -258,32 +259,41 @@ def block_user_jira():
                 "message": "Пользователь не найден",
                 "error": search_response.text
             }), 404
+        print(search_response.json())
 
-        users = search_response.json()
-        account_id = None
-        for user in users:
-            if user.get("displayName") == username:
-                account_id = user.get("accountId")
-                break
 
-        if not account_id:
-            return jsonify({"message": "Пользователь не найден"}), 404
-
-        # Удаление пользователя
-        delete_endpoint = f"/rest/api/3/user?accountId={account_id}"
-        delete_response = requests.delete(
-            f"{JIRA_URL}{delete_endpoint}",
-            auth=HTTPBasicAuth(JIRA_ADMIN_EMAIL, API_TOKEN)
+        for i in search_response.json():
+            for j in i:
+                if j == 'displayName':
+                    if i[j] == username:
+                        accountId = i['accountId']
+                        break
+        print(accountId)
+        query = {
+            'accountId': accountId
+        }
+        block_response = requests.delete(
+            f'{JIRA_URL}{blcok_endpoint}',
+            params=query,
+            auth=HTTPBasicAuth(JIRA_ADMIN_EMAIL,API_TOKEN)
         )
 
-        if delete_response.status_code == 204:
-            return jsonify({"message": "Пользователь успешно удален"}), 204
-        else:
+        if block_response.status_code == 204:
             return jsonify({
-                "message": "Ошибка при удалении пользователя",
-                "error": delete_response.text
-            }), delete_response.status_code
+                "message": "Пользователь успешно удалён"
+            }), 204
 
+
+        elif block_response.status_code == 400:
+            return jsonify({
+                "message": "Пользователь не может быть удалён",
+                "error": block_response.text
+            }), 400
+        elif block_response.status_code == 403:
+            return jsonify({
+                "message": 'У вас недостаточно прав',
+                "eror": block_response.text
+            }), 403
     except Exception as e:
         return jsonify({
             "message": "Внутренняя ошибка сервера",
