@@ -21,6 +21,7 @@ services:
       - jira
     volumes:
       - ./app:/app  # Монтируем папку с кодом приложения
+      - ~/.ssh:/root/.ssh:ro # Монтируем SSH ключи только для чтения
     restart: always
 
   db:
