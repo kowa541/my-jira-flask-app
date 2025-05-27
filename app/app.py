@@ -122,47 +122,6 @@ def create_employee():
 
     return jsonify({"message": "Сотрудник успешно добавлен"}), 201
 
-@app.route('/jira/auth', methods=["POST"])
-def login_in_jira():
-    if not check_token(request):
-        return jsonify({"message": "Необходима авторизация"}), 401
-
-    JIRA_URL = os.getenv('JIRA_URL')
-    API_TOKEN = os.getenv('JIRA_API_TOKEN')
-    JIRA_ADMIN_EMAIL = os.getenv('JIRA_ADMIN_EMAIL')
-
-    data = request.get_json()
-    username = data.get('username')
-
-    if not username:
-        return jsonify({"message": "Необходим username"}), 400
-
-    try:
-        # Проверка авторизации
-        response = requests.get(
-            f"{JIRA_URL}/rest/api/3/myself",
-            auth=HTTPBasicAuth(username, API_TOKEN)
-        )
-
-        if response.status_code == 200:
-            user_data = response.json()
-            return jsonify({
-                "message": "Авторизация успешна",
-                "user": user_data
-            }), 200
-        else:
-            return jsonify({
-                "message": "Ошибка авторизации",
-                "status_code": response.status_code,
-                "error": response.text
-            }), response.status_code
-
-    except Exception as e:
-        return jsonify({
-            "message": "Внутренняя ошибка сервера",
-            "error": str(e)
-        }), 500
-
 
 #4 Добавление пользователя в Jira
 @app.route('/add/user/jira', methods=["POST"])
