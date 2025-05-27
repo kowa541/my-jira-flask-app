@@ -425,7 +425,7 @@ def get_agents_ssh():
         case 502:
             return jsonify({"message": "Плохой шлюз"}), 502
 
-    cmd = "ssh-add -l"
+    cmd = "eval $(ssh-agent) && ssh-add -l"
     stdin, stdout, stderr = ssh.exec_command(cmd)
     agents = stdout.read().decode().splitlines()
 
@@ -444,8 +444,6 @@ def get_servers_ssh():
     servers = cursor.fetchall()
     cursor.close()
     conn.close()
-    print(servers)
-    # Преобразуем результат в список словарей
     servers_list = []
     for server in servers:
         servers_list.append({
